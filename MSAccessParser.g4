@@ -139,6 +139,9 @@ keyword:
     | INTEGER_
     | LONG_
     | NUMERIC_
+    | DECIMAL_
+    | IDENTITY_
+    | AUTOINCREMENT_
     | VARCHAR_
     | VARBINARY_
     | YESNO_
@@ -184,6 +187,9 @@ type_name:
     | INTEGER_
     | LONG_
     | NUMERIC_
+    | DECIMAL_
+    | IDENTITY_
+    | AUTOINCREMENT_
     | VARCHAR_
     | VARBINARY_
     | YESNO_
@@ -221,10 +227,12 @@ aliased_table_name:   table_name (AS_? table_alias)?;
 direction:            ASC_ | DESC_;
 ordering_term:        orderingExpr=expr orderingDirection=(ASC_ | DESC_)? (NULLS_ (FIRST_ | LAST_))?;
 signed_number:        (PLUS | MINUS)? NUMERIC_LITERAL;
-param_def:            param_name type_name (OPEN_PAR NUMERIC_LITERAL CLOSE_PAR)?;
+type_params:          OPEN_PAR NUMERIC_LITERAL (COMMA NUMERIC_LITERAL)? CLOSE_PAR;  // Allows for things like VARCHAR(255) or DECIMAL(10,2)
+param_def:            param_name type_name type_params?;
 optional_parens:      OPEN_PAR CLOSE_PAR;
 default_expr:         DEFAULT_ (signed_number | literal_expr | OPEN_PAR expr CLOSE_PAR | IDENTIFIER optional_parens?);
-column_def:           param_def (NOT_ NULL_)? (WITH_ COMPRESSION_ | COMP_)? default_expr? single_field_constraint?;
+identity_spec:        (IDENTITY_ | AUTOINCREMENT_) type_params?;
+column_def:           param_def identity_spec? (NOT_ NULL_)? (WITH_ COMPRESSION_ | COMP_)? default_expr? single_field_constraint?;
 prefixed_star:        table_name DOT STAR;
 prefixed_column_name: (prefixName=table_name DOT)* columnName=column_name;
 result_column:        STAR | prefixed_star | columnExpr=expr (AS_ columnAlias=column_alias)?;

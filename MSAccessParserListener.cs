@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from C:\Users\stena\RiderProjects\NppDB\NppDB.MSAccess\MSAccessParser.g4 by ANTLR 4.11.1
+// Generated from C:\Users\krqsk\RiderProjects\NppDB\NppDB.MSAccess\MSAccessParser.g4 by ANTLR 4.11.1
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -221,6 +221,16 @@ public interface IMSAccessParserListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitSigned_number([NotNull] MSAccessParser.Signed_numberContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="MSAccessParser.type_params"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterType_params([NotNull] MSAccessParser.Type_paramsContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="MSAccessParser.type_params"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitType_params([NotNull] MSAccessParser.Type_paramsContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="MSAccessParser.param_def"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -250,6 +260,16 @@ public interface IMSAccessParserListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitDefault_expr([NotNull] MSAccessParser.Default_exprContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="MSAccessParser.identity_spec"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterIdentity_spec([NotNull] MSAccessParser.Identity_specContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="MSAccessParser.identity_spec"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitIdentity_spec([NotNull] MSAccessParser.Identity_specContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="MSAccessParser.column_def"/>.
 	/// </summary>

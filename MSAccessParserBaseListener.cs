@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from C:\Users\stena\RiderProjects\NppDB\NppDB.MSAccess\MSAccessParser.g4 by ANTLR 4.11.1
+// Generated from C:\Users\krqsk\RiderProjects\NppDB\NppDB.MSAccess\MSAccessParser.g4 by ANTLR 4.11.1
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -264,6 +264,18 @@ public partial class MSAccessParserBaseListener : IMSAccessParserListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitSigned_number([NotNull] MSAccessParser.Signed_numberContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="MSAccessParser.type_params"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterType_params([NotNull] MSAccessParser.Type_paramsContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="MSAccessParser.type_params"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitType_params([NotNull] MSAccessParser.Type_paramsContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="MSAccessParser.param_def"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
@@ -299,6 +311,18 @@ public partial class MSAccessParserBaseListener : IMSAccessParserListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitDefault_expr([NotNull] MSAccessParser.Default_exprContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="MSAccessParser.identity_spec"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterIdentity_spec([NotNull] MSAccessParser.Identity_specContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="MSAccessParser.identity_spec"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitIdentity_spec([NotNull] MSAccessParser.Identity_specContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="MSAccessParser.column_def"/>.
 	/// <para>The default implementation does nothing.</para>
