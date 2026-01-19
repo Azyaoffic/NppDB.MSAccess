@@ -339,7 +339,9 @@ namespace NppDB.MSAccess
 
         public ISqlExecutor CreateSqlExecutor()
         {
-            return new MsAccessExecutor(GetConnection);
+            var settingsPath = MsAccessBehaviorSettings.TryGetSettingsPath(CommandHost);
+            return new MsAccessExecutor(GetConnection, settingsPath);
+            
         }
 
         public void Refresh()

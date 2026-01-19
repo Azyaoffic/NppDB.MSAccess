@@ -168,6 +168,9 @@ SHORT_:             'SHORT';
 INTEGER_:           'INTEGER';
 LONG_:              'LONG';
 NUMERIC_:           'NUMERIC';
+DECIMAL_:           'DECIMAL';
+IDENTITY_:          'IDENTITY';
+AUTOINCREMENT_:     'AUTOINCREMENT';
 VARCHAR_:           'VARCHAR';
 VARBINARY_:         'VARBINARY';
 YESNO_:             'YESNO';
@@ -201,7 +204,7 @@ SINGLE_LINE_COMMENT: '--' ~[\r\n]* (('\r'? '\n') | EOF) -> channel(HIDDEN);
 
 MULTILINE_COMMENT: '/*' .*? '*/' -> channel(HIDDEN);
 
-SPACES: [ \u000B\t\r\n] -> channel(HIDDEN);
+SPACES: [ \u000B\t\r\n\u000C\u00A0] -> channel(HIDDEN);  // More whitespace characters, such as NBSP
 
 UNEXPECTED_CHAR: .;
 

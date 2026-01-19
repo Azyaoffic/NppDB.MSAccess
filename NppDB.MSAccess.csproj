@@ -89,6 +89,9 @@
     <Reference Include="Antlr4.Runtime.Standard, Version=4.11.1.0, Culture=neutral, PublicKeyToken=e78b2c5abd1fcb3f, processorArchitecture=MSIL">
       <HintPath>..\packages\Antlr4.Runtime.Standard.4.11.1\lib\net45\Antlr4.Runtime.Standard.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
@@ -113,6 +116,7 @@
       <DependentUpon>frmPassword.cs</DependentUpon>
     </Compile>
     <Compile Include="MSAccessAnalyzer.cs" />
+    <Compile Include="MSAccessBehaviorSettings.cs" />
     <Compile Include="MSAccessColumnInfo.cs" />
     <Compile Include="MSAccessConnect.cs" />
     <Compile Include="MSAccessDatabase.cs" />

@@ -44,10 +44,12 @@ namespace NppDB.MSAccess
     {
         private Thread _execTh;
         private readonly Func<OleDbConnection> _connector;
+        private readonly string _behaviorSettingsPath;
 
-        public MsAccessExecutor(Func<OleDbConnection> connector)
+        public MsAccessExecutor(Func<OleDbConnection> connector, string behaviorSettingsPath)
         {
             _connector = connector;
+            _behaviorSettingsPath = behaviorSettingsPath;
         }
 
         public ParserResult Parse(string sqlText, CaretPosition caretPosition)
@@ -102,20 +104,42 @@ namespace NppDB.MSAccess
                     string lastSql = null;
                     try
                     {
+                        var destructiveEnabled = MsAccessBehaviorSettings.IsDestructiveSelectIntoEnabled(_behaviorSettingsPath);
+
                         using (var conn = _connector())
                         {
                             conn.Open();
+                            
                             foreach (var sql in sqlQueries)
                             {
                                 if (string.IsNullOrWhiteSpace(sql)) continue;
                                 lastSql = sql;
 
-                                Console.WriteLine($@"SQL: <{sql}>");
-                                var cmd = new OleDbCommand(sql, conn);
-                                var rd = cmd.ExecuteReader();
+                            if (destructiveEnabled && TryGetTopLevelSelectIntoTarget(sql, out var targetTable))
+                            {
+                                if (TableExists(conn, targetTable))
+                                {
+                                    var dropSql = $"DROP TABLE {QuoteAccess(targetTable)}";
+                                    lastSql = dropSql;
+
+                                    using (var dropCmd = new OleDbCommand(dropSql, conn))
+                                    {
+                                        dropCmd.ExecuteNonQuery();
+                                    }
+
+                                    lastSql = sql;
+                                }
+                            }
+
+                            Console.WriteLine($@"SQL: <{sql}>");
+                            var cmd = new OleDbCommand(sql, conn);
+                            var rd = cmd.ExecuteReader();
+                            {
                                 var dt = new DataTable();
                                 dt.Load(rd);
-                                results.Add(new CommandResult {CommandText = sql, QueryResult = dt, RecordsAffected = rd.RecordsAffected});
+                                results.Add(new CommandResult
+                                    { CommandText = sql, QueryResult = dt, RecordsAffected = rd.RecordsAffected });
+                                }
                             }
                         }
                     }
@@ -146,9 +170,78 @@ namespace NppDB.MSAccess
 
         public bool CanStop()
         {
-            // ReSharper disable once NonConstantEqualityExpressionHasConstantResult
             return _execTh != null && (_execTh.ThreadState & ThreadState.Running) != 0;
         }
 
+        private static bool TryGetTopLevelSelectIntoTarget(string sql, out string targetTableName)
+        {
+            targetTableName = null;
+            if (string.IsNullOrWhiteSpace(sql)) return false;
+
+            var input = CharStreams.fromString(sql);
+
+            var lexer = new MSAccessLexer(input);
+            lexer.RemoveErrorListeners();
+            lexer.AddErrorListener(MsAccessLexerErrorListener.Instance);
+
+            var tokens = new CommonTokenStream(lexer);
+
+            var parserErrorListener = new MsAccessParserErrorListener();
+            var parser = new MSAccessParser(tokens);
+            parser.RemoveErrorListeners();
+            parser.AddErrorListener(parserErrorListener);
+
+            var tree = parser.parse();
+
+            if (parserErrorListener.Errors.Count > 0) return false;
+
+            var stmtList = tree.sql_stmt_list();
+            if (stmtList == null) return false;
+
+            var stmt = stmtList.sql_stmt(0);
+            if (stmt == null) return false;
+
+            var into = stmt.select_into_stmt();
+            if (into == null) return false;
+
+            var raw = into.tableName?.GetText();
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+
+            targetTableName = NormalizeIdentifier(raw);
+            return !string.IsNullOrWhiteSpace(targetTableName);
+        }
+
+        private static string NormalizeIdentifier(string raw)
+        {
+            raw = raw.Trim();
+
+            while (raw.Length >= 2 && raw[0] == '(' && raw[raw.Length - 1] == ')')
+                raw = raw.Substring(1, raw.Length - 2).Trim();
+
+            if (raw.Length >= 2 && raw[0] == '[' && raw[raw.Length - 1] == ']')
+                return raw.Substring(1, raw.Length - 2).Replace("]]", "]");
+
+            if (raw.Length >= 2 && raw[0] == '"' && raw[raw.Length - 1] == '"')
+                return raw.Substring(1, raw.Length - 2).Replace("\"\"", "\"");
+
+            if (raw.Length >= 2 && raw[0] == '\'' && raw[raw.Length - 1] == '\'')
+                return raw.Substring(1, raw.Length - 2).Replace("''", "'");
+
+            return raw;
+        }
+
+        private static string QuoteAccess(string name)
+        {
+            return $"[{(name ?? "").Replace("]", "]]")}]";
+        }
+
+        private static bool TableExists(OleDbConnection conn, string tableName)
+        {
+            using (var dt = conn.GetSchema(OleDbMetaDataCollectionNames.Tables,
+                       new[] { null, null, tableName, "TABLE" }))
+            {
+                return dt.Rows.Count > 0;
+            }
+        }
     }
 }
