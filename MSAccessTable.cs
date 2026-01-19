@@ -30,16 +30,17 @@ namespace NppDB.MSAccess
                     cnn.Open();
 
                     Nodes.Clear();
-                    
+
                     var columns = new List<MSAccessColumnInfo>();
 
                     var primaryKeyColumnNames = CollectPrimaryKeys(cnn, ref columns);
                     var foreignKeyColumnNames = CollectForeignKeys(cnn, ref columns);
                     var indexedColumnNames = CollectIndices(cnn, ref columns);
-                    
-                    var columnCount = CollectColumns(cnn, ref columns, primaryKeyColumnNames, foreignKeyColumnNames, indexedColumnNames);
+
+                    var columnCount = CollectColumns(cnn, ref columns, primaryKeyColumnNames, foreignKeyColumnNames,
+                        indexedColumnNames);
                     if (columnCount == 0) return;
-                    
+
                     var maxLength = columns.Max(c => c.ColumnName.Length);
                     columns.ForEach(c => c.AdjustColumnNameFixedWidth(maxLength));
                     Nodes.AddRange(columns.ToArray<TreeNode>());
@@ -135,6 +136,7 @@ namespace NppDB.MSAccess
                     }
                 }));
             }
+
             return menuList;
         }
 
@@ -144,18 +146,102 @@ namespace NppDB.MSAccess
             return connect;
         }
 
+
+        private static string QuoteIdentifier(string name)
+        {
+            return $"[{(name ?? string.Empty).Replace("]", "]]")}]"; // escape closing bracket
+        }
+
+        private static HashSet<string> CollectAutoIncrementColumns(OleDbConnection connection, string tableOrViewName)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = $"SELECT * FROM {QuoteIdentifier(tableOrViewName)} WHERE 1=0";
+                    using (var rd = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo))
+                    {
+                        var schema = rd?.GetSchemaTable();
+                        if (schema == null) return result;
+
+                        var hasIsAutoIncrement = schema.Columns.Contains("IsAutoIncrement");
+                        var hasIsIdentity = schema.Columns.Contains("IsIdentity");
+
+                        foreach (DataRow r in schema.Rows)
+                        {
+                            var colName = r["ColumnName"]?.ToString();
+                            if (string.IsNullOrWhiteSpace(colName)) continue;
+
+                            var isAuto = false;
+                            if (hasIsAutoIncrement && r["IsAutoIncrement"] is bool b && b) isAuto = true;
+                            else if (hasIsIdentity && r["IsIdentity"] is bool i && i) isAuto = true;
+
+                            if (isAuto) result.Add(colName);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // if error - just ignore
+            }
+
+            return result;
+        }
+        
+        private static (int seed, int inc)? TryGetSeedInc(string oleDbConnStr, string table, string column)
+        {
+            try
+            {
+                var adoConnType = Type.GetTypeFromProgID("ADODB.Connection");
+                dynamic adoConn = Activator.CreateInstance(adoConnType);
+                adoConn.Open(oleDbConnStr);
+
+                var catType = Type.GetTypeFromProgID("ADOX.Catalog");
+                dynamic cat = Activator.CreateInstance(catType);
+                cat.ActiveConnection = adoConn;
+
+                dynamic col = cat.Tables[table].Columns[column];
+                int seed = (int)col.Properties["Seed"].Value;
+                int inc  = (int)col.Properties["Increment"].Value;
+
+                adoConn.Close();
+                return (seed, inc);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private int CollectColumns(OleDbConnection connection, ref List<MSAccessColumnInfo> columns,
             in List<string> primaryKeyColumnNames,
             in List<string> foreignKeyColumnNames,
             in List<string> indexedColumnNames)
         {
-            var dt = connection.GetSchema(OleDbMetaDataCollectionNames.Columns, new[] {null, null, Text, null});
+            var autoIncrementColumns = CollectAutoIncrementColumns(connection, Text);
+            var dt = connection.GetSchema(OleDbMetaDataCollectionNames.Columns, new[] { null, null, Text, null });
 
             var count = 0;
             foreach (var row in dt.AsEnumerable().OrderBy(r => r["ordinal_position"]))
             {
                 var columnName = row["column_name"].ToString();
                 var isNullable = Convert.ToBoolean(row["is_nullable"]);
+                var isAutoIncrement = autoIncrementColumns.Contains(columnName);
+
+                var seed = 0;
+                var inc = 0;
+                if (isAutoIncrement)
+                {
+                    // Try to get seed and increment values
+                    var seedInc = TryGetSeedInc(connection.ConnectionString, Text, columnName);
+                    if (seedInc.HasValue)
+                    {
+                        seed = seedInc.Value.seed;
+                        inc = seedInc.Value.inc;
+                    }
+                }
 
                 var oleDbType = (OleDbType)int.Parse(row["data_type"].ToString());
                 var typeName = oleDbType.ToString().ToUpper();
@@ -173,6 +259,9 @@ namespace NppDB.MSAccess
                     else
                         typeDetails += $"({numericPrecisionObj})";
                 }
+                
+                if (isAutoIncrement) typeDetails += " AUTOINCREMENT";
+                if (seed != 0 || inc != 0) typeDetails += $"({seed},{inc})";
 
                 var options = 0;
                 if (!isNullable) options += 1;
@@ -187,29 +276,37 @@ namespace NppDB.MSAccess
                 tooltipText.AppendLine($"Column: {columnName}");
                 tooltipText.AppendLine($"Type: {typeDetails}");
                 tooltipText.AppendLine($"Nullable: {(isNullable ? "Yes" : "No")}");
+                if (isAutoIncrement)
+                    tooltipText.Append("Auto-increment: Yes");
+                if (seed != 0 || inc != 0)
+                    tooltipText.AppendLine($" ({seed}, {inc})");
+                else 
+                    tooltipText.AppendLine();
 
                 var defaultValueObj = row["column_default"];
                 if (!(defaultValueObj is DBNull) && defaultValueObj != null)
                 {
-                     tooltipText.AppendLine($"Default: {defaultValueObj}");
+                    tooltipText.AppendLine($"Default: {defaultValueObj}");
                 }
 
                 if (primaryKeyColumnNames.Contains(columnName))
-                     tooltipText.AppendLine("Primary Key Member");
+                    tooltipText.AppendLine("Primary Key Member");
                 if (foreignKeyColumnNames.Contains(columnName))
-                     tooltipText.AppendLine("Foreign Key Member");
+                    tooltipText.AppendLine("Foreign Key Member");
 
                 columnInfoNode.ToolTipText = tooltipText.ToString().TrimEnd();
 
 
                 columns.Insert(count++, columnInfoNode);
             }
+
             return count;
         }
-        
+
         private List<string> CollectPrimaryKeys(OleDbConnection connection, ref List<MSAccessColumnInfo> columns)
         {
-            var dataTable = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Primary_Keys, new object[] { null, null, Text });
+            var dataTable =
+                connection.GetOleDbSchemaTable(OleDbSchemaGuid.Primary_Keys, new object[] { null, null, Text });
 
             var names = new List<string>();
             if (dataTable == null) return names;
@@ -230,9 +327,10 @@ namespace NppDB.MSAccess
                 columns.Add(pkNode);
                 names.Add(columnName);
             }
+
             return names;
         }
-        
+
         private List<string> CollectForeignKeys(OleDbConnection connection, ref List<MSAccessColumnInfo> columns)
         {
             var schema = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Foreign_Keys,
@@ -261,9 +359,10 @@ namespace NppDB.MSAccess
                 columns.Add(fkNode);
                 names.Add(fkColumnName);
             }
+
             return names;
         }
-        
+
         private List<string> CollectIndices(OleDbConnection connection, ref List<MSAccessColumnInfo> columns)
         {
             var schema = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Indexes,
@@ -297,6 +396,7 @@ namespace NppDB.MSAccess
 
                 names.Add(columnName);
             }
+
             return names;
         }
     }
