@@ -31,7 +31,7 @@ namespace NppDB.MSAccess
 
                     Nodes.Clear();
 
-                    var columns = new List<MSAccessColumnInfo>();
+                    var columns = new List<MsAccessColumn>();
 
                     var primaryKeyColumnNames = CollectPrimaryKeys(cnn, ref columns);
                     var foreignKeyColumnNames = CollectForeignKeys(cnn, ref columns);
@@ -215,7 +215,7 @@ namespace NppDB.MSAccess
             }
         }
 
-        private int CollectColumns(OleDbConnection connection, ref List<MSAccessColumnInfo> columns,
+        private int CollectColumns(OleDbConnection connection, ref List<MsAccessColumn> columns,
             in List<string> primaryKeyColumnNames,
             in List<string> foreignKeyColumnNames,
             in List<string> indexedColumnNames)
@@ -269,7 +269,7 @@ namespace NppDB.MSAccess
                 if (primaryKeyColumnNames.Contains(columnName)) options += 100;
                 if (foreignKeyColumnNames.Contains(columnName)) options += 1000;
 
-                var columnInfoNode = new MSAccessColumnInfo(columnName, typeDetails, 0, options);
+                var columnInfoNode = new MsAccessColumn(columnName, typeDetails, 0, options);
 
 
                 var tooltipText = new StringBuilder();
@@ -303,7 +303,7 @@ namespace NppDB.MSAccess
             return count;
         }
 
-        private List<string> CollectPrimaryKeys(OleDbConnection connection, ref List<MSAccessColumnInfo> columns)
+        private List<string> CollectPrimaryKeys(OleDbConnection connection, ref List<MsAccessColumn> columns)
         {
             var dataTable =
                 connection.GetOleDbSchemaTable(OleDbSchemaGuid.Primary_Keys, new object[] { null, null, Text });
@@ -317,7 +317,7 @@ namespace NppDB.MSAccess
                 var columnName = row["column_name"].ToString();
                 var primaryKeyType = $"({columnName})";
 
-                var pkNode = new MSAccessColumnInfo(primaryKeyName, primaryKeyType, 1, 0);
+                var pkNode = new MsAccessColumn(primaryKeyName, primaryKeyType, 1, 0);
 
                 var tooltipText = new StringBuilder();
                 tooltipText.AppendLine($"Primary Key Constraint: {primaryKeyName}");
@@ -331,7 +331,7 @@ namespace NppDB.MSAccess
             return names;
         }
 
-        private List<string> CollectForeignKeys(OleDbConnection connection, ref List<MSAccessColumnInfo> columns)
+        private List<string> CollectForeignKeys(OleDbConnection connection, ref List<MsAccessColumn> columns)
         {
             var schema = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Foreign_Keys,
                 new object[] { null, null, null, null, null, Text });
@@ -347,7 +347,7 @@ namespace NppDB.MSAccess
                 var pkColumnName = row["pk_column_name"].ToString();
                 var foreignKeyType = $"({fkColumnName}) -> {pkTableName} ({pkColumnName})";
 
-                var fkNode = new MSAccessColumnInfo(foreignKeyName, foreignKeyType, 2, 0);
+                var fkNode = new MsAccessColumn(foreignKeyName, foreignKeyType, 2, 0);
 
                 var tooltipText = new StringBuilder();
                 tooltipText.AppendLine($"Foreign Key Constraint: {foreignKeyName}");
@@ -363,7 +363,7 @@ namespace NppDB.MSAccess
             return names;
         }
 
-        private List<string> CollectIndices(OleDbConnection connection, ref List<MSAccessColumnInfo> columns)
+        private List<string> CollectIndices(OleDbConnection connection, ref List<MsAccessColumn> columns)
         {
             var schema = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Indexes,
                 new object[] { null, null, null, null, Text });
@@ -382,7 +382,7 @@ namespace NppDB.MSAccess
 
                 if (!processedIndexNames.Contains(indexName))
                 {
-                    var indexNode = new MSAccessColumnInfo(indexName, indexType, isUnique ? 4 : 3, 0);
+                    var indexNode = new MsAccessColumn(indexName, indexType, isUnique ? 4 : 3, 0);
 
                     var tooltipText = new StringBuilder();
                     tooltipText.AppendLine($"Index: {indexName}");

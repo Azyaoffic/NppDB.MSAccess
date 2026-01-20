@@ -117,7 +117,7 @@
     </Compile>
     <Compile Include="MSAccessAnalyzer.cs" />
     <Compile Include="MSAccessBehaviorSettings.cs" />
-    <Compile Include="MSAccessColumnInfo.cs" />
+    <Compile Include="MSAccessColumn.cs" />
     <Compile Include="MSAccessConnect.cs" />
     <Compile Include="MSAccessDatabase.cs" />
     <Compile Include="MSAccessExecutor.cs" />
