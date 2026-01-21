@@ -67,6 +67,16 @@ namespace NppDB.MSAccess
             var tableQuoted = QuoteAccess(tableNode.Text);
             var columnQuoted = QuoteAccess(ColumnName);
 
+            menuList.Items.Add(new ToolStripButton("Select distinct values", null, (s, e) =>
+                {
+                    host.Execute(NppDbCommandType.NEW_FILE, null);
+                    var query = $"SELECT DISTINCT {columnQuoted} FROM {tableQuoted} ORDER BY {columnQuoted};";
+                    host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
+                }
+            ));
+
+            menuList.Items.Add(new ToolStripSeparator());
+
             menuList.Items.Add(new ToolStripButton("Create ALTER COLUMN query", null, (s, e) =>
                 {
                     host.Execute(NppDbCommandType.NEW_FILE, null);
