@@ -70,8 +70,10 @@ namespace NppDB.MSAccess
             menuList.Items.Add(new ToolStripButton("Select distinct values", null, (s, e) =>
                 {
                     host.Execute(NppDbCommandType.NEW_FILE, null);
+                    var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     var query = $"SELECT DISTINCT {columnQuoted} FROM {tableQuoted} ORDER BY {columnQuoted};";
                     host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
+                    host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 }
             ));
 
@@ -80,16 +82,20 @@ namespace NppDB.MSAccess
             menuList.Items.Add(new ToolStripButton("Create ALTER COLUMN query", null, (s, e) =>
                 {
                     host.Execute(NppDbCommandType.NEW_FILE, null);
+                    var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     var query = $"ALTER TABLE {tableQuoted} ALTER COLUMN {columnQuoted} <DATA_TYPE>;";
                     host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
+                    host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 })
                 { Enabled = allowAlter });
 
             menuList.Items.Add(new ToolStripButton("Create DROP COLUMN query", null, (s, e) =>
                 {
                     host.Execute(NppDbCommandType.NEW_FILE, null);
+                    var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     var query = $"ALTER TABLE {tableQuoted} DROP COLUMN {columnQuoted};";
                     host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
+                    host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 })
                 { Enabled = allowAlter });
 
