@@ -139,13 +139,37 @@ namespace NppDB.MSAccess
             
             // options to generate AI prompt
             menuList.Items.Add(new ToolStripSeparator());
-            if (TypeName == "TABLE")
-            {
-                menuList.Items.Add(new ToolStripMenuItem("Explain table in plain language", null, (sender, args) =>
-                {
-                    ShowExplainTablePrompt();
-                }));
-            }
+
+            var aiMenu = new ToolStripMenuItem("AI Prompts");
+
+            aiMenu.DropDownItems.Add(new ToolStripMenuItem("Explain table in plain language", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.EXPLAIN_PLAIN_LANGUAGE)));
+
+            aiMenu.DropDownItems.Add(new ToolStripMenuItem("Generate GROUP BY aggregation query", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.GROUP_BY_AGGREGATION_QUERY)));
+
+            aiMenu.DropDownItems.Add(new ToolStripMenuItem("Generate INSERT test data", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.INSERT_TEST_DATA)));
+
+            aiMenu.DropDownItems.Add(new ToolStripMenuItem("Propose data validation rules", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.PROPOSE_VALIDATION_RULES)));
+
+            var modelMenu = new ToolStripMenuItem("Generate a data model class");
+            modelMenu.DropDownItems.Add(new ToolStripMenuItem("Python", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.DATA_MODEL_PYTHON)));
+            modelMenu.DropDownItems.Add(new ToolStripMenuItem("Java", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.DATA_MODEL_JAVA)));
+            modelMenu.DropDownItems.Add(new ToolStripMenuItem("C#", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.DATA_MODEL_C_SHARP)));
+            aiMenu.DropDownItems.Add(modelMenu);
+
+            aiMenu.DropDownItems.Add(new ToolStripMenuItem("Create REST API endpoints specification", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.REST_API_ENDPOINTS_SPEC)));
+
+            aiMenu.DropDownItems.Add(new ToolStripMenuItem("Suggest visualizations for the data", null,
+                (s, e) => ShowTablePrompt(TablePromptKind.SUGGEST_VISUALIZATIONS)));
+
+            menuList.Items.Add(aiMenu);
 
             return menuList;
         }
@@ -410,60 +434,222 @@ namespace NppDB.MSAccess
             return names;
         }
 
-        private void ShowExplainTablePrompt()
+        private enum TablePromptKind
+        {
+            EXPLAIN_PLAIN_LANGUAGE,
+            GROUP_BY_AGGREGATION_QUERY,
+            INSERT_TEST_DATA,
+            PROPOSE_VALIDATION_RULES,
+            DATA_MODEL_PYTHON,
+            DATA_MODEL_JAVA,
+            DATA_MODEL_C_SHARP,
+            REST_API_ENDPOINTS_SPEC,
+            SUGGEST_VISUALIZATIONS
+        }
+
+        private void ShowTablePrompt(TablePromptKind kind)
         {
             var tableName = Text;
+            var columnsWithTypes = GetColumnsWithTypesFromTree();
+            if (columnsWithTypes == null) return; // error already shown
 
-            var columnsBuilder = new StringBuilder();
+            string title;
+            string prompt;
 
-            // only works if tree was expanded once
+            switch (kind)
+            {
+                case TablePromptKind.EXPLAIN_PLAIN_LANGUAGE:
+                    title = "Explain table in plain language";
+                    prompt =
+                        "You are a Business Analyst.\n" +
+                        "Explain the purpose and content of this database table in plain, non-technical English.\n" +
+                        "Infer what the table represents, what a single row means (grain), and the likely use-cases.\n" +
+                        "Call out likely identifiers, dates, amounts, statuses, and any suspicious/unclear columns.\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n" +
+                        "\n" +
+                        "Output:\n" +
+                        "- 1 paragraph plain-language summary\n" +
+                        "- bullet list of what each column likely means\n" +
+                        "- 5 example business questions this table can answer\n";
+                    break;
+
+                case TablePromptKind.GROUP_BY_AGGREGATION_QUERY:
+                    title = "Generate GROUP BY aggregation query";
+                    prompt =
+                        "You are an expert Microsoft Access SQL developer.\n" +
+                        "Create 3 useful GROUP BY aggregation queries for the given table using Microsoft Access SQL syntax.\n" +
+                        "Use bracket quoting for identifiers when needed (e.g., [Order Date]).\n" +
+                        "If you need date bucketing, use Access-friendly expressions.\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n" +
+                        "\n" +
+                        "Output format:\n" +
+                        "For each query:\n" +
+                        "1) business question it answers\n" +
+                        "2) final SQL only\n";
+                    break;
+
+                case TablePromptKind.INSERT_TEST_DATA:
+                    title = "Generate INSERT test data";
+                    prompt =
+                        "You are an expert Microsoft Access SQL developer.\n" +
+                        "Generate realistic test data for this table.\n" +
+                        "Return 10 INSERT statements in Microsoft Access SQL.\n" +
+                        "Rules:\n" +
+                        "- Use single quotes for text.\n" +
+                        "- Use #...# for dates if you include date literals.\n" +
+                        "- If there is an AutoNumber/identity key, omit it from INSERT.\n" +
+                        "- Keep values consistent (e.g., status values, amounts, dates).\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n";
+                    break;
+
+                case TablePromptKind.PROPOSE_VALIDATION_RULES:
+                    title = "Propose data validation rules";
+                    prompt =
+                        "You are a database designer.\n" +
+                        "Propose practical data validation rules and constraints for this table.\n" +
+                        "Include: required/optional, allowed ranges, formats, uniqueness, cross-field rules, and referential integrity assumptions.\n" +
+                        "Prefer rules that can be implemented in Microsoft Access (field validation rules, input masks, indexes, relationships).\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n" +
+                        "\n" +
+                        "Output as a concise list grouped by column, plus any table-level rules.\n";
+                    break;
+
+                case TablePromptKind.DATA_MODEL_PYTHON:
+                    title = "Generate data model class (Python)";
+                    prompt =
+                        "You are a software engineer.\n" +
+                        "Generate a Python data model for this table.\n" +
+                        "Use a @dataclass with type hints. Use Optional[...] where appropriate.\n" +
+                        "Choose reasonable Python types based on column names/types.\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n" +
+                        "\n" +
+                        "Output: only the Python code.\n";
+                    break;
+
+                case TablePromptKind.DATA_MODEL_JAVA:
+                    title = "Generate data model class (Java)";
+                    prompt =
+                        "You are a software engineer.\n" +
+                        "Generate a Java POJO data model for this table.\n" +
+                        "Include fields, getters/setters, and sensible types (String, Integer/Long, BigDecimal, LocalDate/LocalDateTime, Boolean).\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n" +
+                        "\n" +
+                        "Output: only the Java code.\n";
+                    break;
+
+                case TablePromptKind.DATA_MODEL_C_SHARP:
+                    title = "Generate data model class (C#)";
+                    prompt =
+                        "You are a software engineer.\n" +
+                        "Generate a C# data model class for this table.\n" +
+                        "Use properties with sensible .NET types (string, int?, long?, decimal?, DateTime?, bool?).\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n" +
+                        "\n" +
+                        "Output: only the C# code.\n";
+                    break;
+
+                case TablePromptKind.REST_API_ENDPOINTS_SPEC:
+                    title = "Create REST API endpoints specification";
+                    prompt =
+                        "You are a backend architect.\n" +
+                        "Create a specification for HTTP REST API endpoints for this table.\n" +
+                        "Include CRUD endpoints, filtering/sorting, pagination, common validation errors, and example request/response JSON.\n" +
+                        "If a primary key is not obvious, propose one and state assumptions.\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n";
+                    break;
+
+                case TablePromptKind.SUGGEST_VISUALIZATIONS:
+                    title = "Suggest visualizations for the data";
+                    prompt =
+                        "You are a data analyst.\n" +
+                        "Suggest useful visualizations and KPIs for this table.\n" +
+                        "For each suggestion: chart type, required fields, grouping/time grain, and the business question it answers.\n" +
+                        "\n" +
+                        $"Table: {tableName}\n" +
+                        "Columns:\n" +
+                        columnsWithTypes + "\n";
+                    break;
+
+                default:
+                    return;
+            }
+
+            CopyPromptToClipboardAndShow(title, prompt);
+        }
+
+        private string GetColumnsWithTypesFromTree()
+        {
+            var sb = new StringBuilder();
+
             foreach (TreeNode node in Nodes)
             {
                 if (node == null) continue;
-                columnsBuilder.AppendLine(node.Text);
+                sb.AppendLine(node.Text);
             }
 
-            var columnsWithTypes = columnsBuilder.ToString().TrimEnd();
-            if (string.IsNullOrWhiteSpace(columnsWithTypes))
+            var text = sb.ToString().TrimEnd('\r', '\n');
+            if (string.IsNullOrWhiteSpace(text))
             {
                 MessageBox.Show(
-                    "Warning: No column information available.\n" +
-                    "Please expand the table node in the tree view once to load column details, then try again.",
-                    "NppDB - AI Prompt Generation",
+                    "No columns loaded in tree. Please expand the table node once to load columns, then retry.",
+                    "NppDB",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning
                 );
+                return null;
 
-                return;
             }
 
-            var prompt =
-                "You are a Business Analyst.\n" +
-                $"Explain the purpose and content of the database table {tableName} in plain, non-technical English.\n" +
-                "Describe what kind of business data is stored here based on the provided column names.\n" +
-                "Columns:\n" +
-                columnsWithTypes + "\n";
+            return text;
+        }
 
+        private void CopyPromptToClipboardAndShow(string title, string prompt)
+        {
             try
             {
                 Clipboard.SetText(prompt);
 
                 var dialogMessage =
-                    "AI prompt copied to clipboard!\n" +
+                    "AI prompt copied to clipboard!\n\n" +
                     "--- Prompt Content: ---\n" +
                     prompt;
 
-                MessageBox.Show(dialogMessage, "NppDB - AI Prompt Generated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(dialogMessage, "NppDB - " + title, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    $"Error copying prompt to clipboard or displaying prompt: {ex.Message}",
+                    "Error copying prompt to clipboard or displaying prompt: " + ex.Message,
                     "NppDB",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
                 );
             }
         }
+
     }
 }
