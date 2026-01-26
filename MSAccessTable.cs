@@ -136,6 +136,16 @@ namespace NppDB.MSAccess
                     }
                 }));
             }
+            
+            // options to generate AI prompt
+            menuList.Items.Add(new ToolStripSeparator());
+            if (TypeName == "TABLE")
+            {
+                menuList.Items.Add(new ToolStripMenuItem("Explain table in plain language", null, (sender, args) =>
+                {
+                    ShowExplainTablePrompt();
+                }));
+            }
 
             return menuList;
         }
@@ -398,6 +408,62 @@ namespace NppDB.MSAccess
             }
 
             return names;
+        }
+
+        private void ShowExplainTablePrompt()
+        {
+            var tableName = Text;
+
+            var columnsBuilder = new StringBuilder();
+
+            // only works if tree was expanded once
+            foreach (TreeNode node in Nodes)
+            {
+                if (node == null) continue;
+                columnsBuilder.AppendLine(node.Text);
+            }
+
+            var columnsWithTypes = columnsBuilder.ToString().TrimEnd();
+            if (string.IsNullOrWhiteSpace(columnsWithTypes))
+            {
+                MessageBox.Show(
+                    "Warning: No column information available.\n" +
+                    "Please expand the table node in the tree view once to load column details, then try again.",
+                    "NppDB - AI Prompt Generation",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+
+                return;
+            }
+
+            var prompt =
+                "You are a Business Analyst.\n" +
+                $"Explain the purpose and content of the database table {tableName} in plain, non-technical English.\n" +
+                "Describe what kind of business data is stored here based on the provided column names.\n" +
+                "Columns:\n" +
+                columnsWithTypes + "\n";
+
+            try
+            {
+                Clipboard.SetText(prompt);
+
+                var dialogMessage =
+                    "AI prompt copied to clipboard!\n" +
+                    "--- Prompt Content: ---\n" +
+                    prompt;
+
+                MessageBox.Show(dialogMessage, "NppDB - AI Prompt Generated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Error copying prompt to clipboard or displaying prompt: {ex.Message}",
+                    "NppDB",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
         }
     }
 }
