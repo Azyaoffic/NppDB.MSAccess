@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.OleDb;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using Newtonsoft.Json;
 using NppDB.Comm;
 
 namespace NppDB.MSAccess
@@ -87,6 +89,11 @@ namespace NppDB.MSAccess
                 host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
             }));
+            var exportMenu = new ToolStripMenuItem("Select all as");
+            exportMenu.DropDownItems.Add(new ToolStripMenuItem("JSON", null, (s, e) => { SelectAllAsJson(); }));
+            exportMenu.DropDownItems.Add(new ToolStripMenuItem("CSV", null, (s, e) => { SelectAllAsCsv(); }));
+            menuList.Items.Add(exportMenu);
+
             menuList.Items.Add(new ToolStripSeparator());
 
             var dropObjectText = TypeName == "VIEW" ? "Drop view" : "Drop table";
@@ -184,6 +191,162 @@ namespace NppDB.MSAccess
         private static string QuoteIdentifier(string name)
         {
             return $"[{(name ?? string.Empty).Replace("]", "]]")}]"; // escape closing bracket
+        }
+
+        private void SelectAllAsJson()
+        {
+            var connect = GetDbConnect();
+            if (connect?.CommandHost == null) return;
+
+            var tableQuoted = QuoteIdentifier(Text);
+
+            SelectAllAsText("JSON", () =>
+            {
+                using (var cnn = connect.GetConnection())
+                {
+                    cnn.Open();
+
+                    var dt = new DataTable();
+                    using (var cmd = cnn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT * FROM " + tableQuoted;
+                        using (var da = new OleDbDataAdapter(cmd))
+                        {
+                            da.Fill(dt);
+                        }
+                    }
+
+                    var json = JsonConvert.SerializeObject(dt, Formatting.Indented);
+                    if (string.IsNullOrWhiteSpace(json)) json = "[]";
+                    return json;
+                }
+            });
+        }
+
+        private void SelectAllAsCsv()
+        {
+            var connect = GetDbConnect();
+            if (connect?.CommandHost == null) return;
+
+            var tableQuoted = QuoteIdentifier(Text);
+
+            SelectAllAsText("CSV", () =>
+            {
+                using (var cnn = connect.GetConnection())
+                {
+                    cnn.Open();
+
+                    var dt = new DataTable();
+                    using (var cmd = cnn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT * FROM " + tableQuoted;
+                        using (var da = new OleDbDataAdapter(cmd))
+                        {
+                            da.Fill(dt);
+                        }
+                    }
+
+                    return ConvertDataTableToCsv(dt);
+                }
+            });
+        }
+
+        private void SelectAllAsText(string kind, Func<string> loader)
+        {
+            var connect = GetDbConnect();
+            if (connect?.CommandHost == null) return;
+            var host = connect.CommandHost;
+
+            try
+            {
+                if (TreeView != null)
+                {
+                    TreeView.Enabled = false;
+                    TreeView.Cursor = Cursors.WaitCursor;
+                }
+
+                var text = loader?.Invoke() ?? "";
+
+                try
+                {
+                    Clipboard.SetText(text);
+                }
+                catch (Exception exClipboard)
+                {
+                    MessageBox.Show(
+                        "Export succeeded but copying to clipboard failed: " + exClipboard.Message,
+                        "NppDB",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                }
+
+                host.Execute(NppDbCommandType.NEW_FILE, null);
+                host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { text });
+
+                MessageBox.Show(
+                    kind + " exported to a new tab. Output was also copied to clipboard.",
+                    "NppDB",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, @"Exception");
+            }
+            finally
+            {
+                if (TreeView != null)
+                {
+                    TreeView.Enabled = true;
+                    TreeView.Cursor = null;
+                }
+            }
+        }
+
+        private static string ConvertDataTableToCsv(DataTable dt)
+        {
+            if (dt == null) return string.Empty;
+
+            var csv = "";
+
+            for (var i = 0; i < dt.Columns.Count; i++)
+            {
+                if (i > 0) csv += ",";
+                csv += ToCsvValue(dt.Columns[i].ColumnName);
+            }
+            csv += "\n";
+
+            foreach (DataRow row in dt.Rows)
+            {
+                for (var i = 0; i < dt.Columns.Count; i++)
+                {
+                    if (i > 0) csv += ",";
+
+                    var val = row[i];
+                    if (val == null || val == DBNull.Value) csv = csv + "";
+                    else
+                    {
+                        var s = Convert.ToString(val, CultureInfo.InvariantCulture);
+                        csv += ToCsvValue(s);
+                    }
+                }
+                csv += "\n";
+            }
+
+            return csv;
+        }
+
+        private static string ToCsvValue(string value)
+        {
+            if (value == null) return string.Empty;
+
+            var needsQuotes = value.IndexOfAny(new[] { ',', '"', '\r', '\n' }) >= 0;
+            if (value.Contains("\"")) value = value.Replace("\"", "\"\"");
+            if (needsQuotes) value = "\"" + value + "\"";
+
+            return value;
         }
 
         private static HashSet<string> CollectAutoIncrementColumns(OleDbConnection connection, string tableOrViewName)
