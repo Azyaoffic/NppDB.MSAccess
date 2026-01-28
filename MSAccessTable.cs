@@ -74,6 +74,7 @@ namespace NppDB.MSAccess
             menuList.Items.Add(new ToolStripButton("Select all rows", null, (s, e) =>
             {
                 host.Execute(NppDbCommandType.NEW_FILE, null);
+                host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
                 var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 var query = $"SELECT * FROM {objectNameQuoted}";
                 host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
@@ -83,6 +84,7 @@ namespace NppDB.MSAccess
             menuList.Items.Add(new ToolStripButton("Select top 100 rows", null, (s, e) =>
             {
                 host.Execute(NppDbCommandType.NEW_FILE, null);
+                host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
                 var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 var query = $"SELECT TOP 100 * FROM {objectNameQuoted}";
                 host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
