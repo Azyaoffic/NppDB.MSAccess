@@ -97,6 +97,38 @@ namespace NppDB.MSAccess
             menuList.Items.Add(exportMenu);
 
             menuList.Items.Add(new ToolStripSeparator());
+            
+            if (TypeName == "TABLE")
+            {
+                // this one only includes PK as anything else is much harder to extract
+                menuList.Items.Add(new ToolStripButton("Generate CREATE TABLE query", null, (s, e) =>
+                {
+                    var ddl = GenerateCreateTableQuery(connect);
+                    if (string.IsNullOrWhiteSpace(ddl)) return;
+
+                    try
+                    {
+                        Clipboard.SetText(ddl);
+                    }
+                    catch (Exception)
+                    {
+                        // ignore
+                    }
+
+                    host.Execute(NppDbCommandType.NEW_FILE, null);
+                    host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
+                    host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { ddl });
+
+                    MessageBox.Show(
+                        "CREATE TABLE query copied to clipboard and opened in a new tab.",
+                        "NppDB",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                }));
+                
+                menuList.Items.Add(new ToolStripSeparator());
+            }
 
             var dropObjectText = TypeName == "VIEW" ? "Drop view" : "Drop table";
 
@@ -350,6 +382,184 @@ namespace NppDB.MSAccess
 
             return value;
         }
+        
+        private string GenerateCreateTableQuery(MsAccessConnect connect)
+        {
+            using (var cnn = connect.GetConnection())
+            {
+                try
+                {
+                    cnn.Open();
+
+                    var tableName = Text;
+                    var tableQuoted = QuoteIdentifier(tableName);
+
+                    var dtCols = cnn.GetSchema(OleDbMetaDataCollectionNames.Columns, new[] { null, null, tableName, null });
+                    if (dtCols == null || dtCols.Rows.Count == 0) return null;
+
+                    var hasAuto = dtCols.Columns.Contains("IS_AUTOINCREMENT");
+                    var hasNullable = dtCols.Columns.Contains("IS_NULLABLE");
+
+                    var colDefs = "";
+                    foreach (var r in dtCols.AsEnumerable().OrderBy(x => Convert.ToInt32(x["ORDINAL_POSITION"])))
+                    {
+                        var colName = r["COLUMN_NAME"]?.ToString();
+                        if (string.IsNullOrWhiteSpace(colName)) continue;
+
+                        var isAuto = false;
+                        if (hasAuto)
+                        {
+                            try { isAuto = Convert.ToBoolean(r["IS_AUTOINCREMENT"]); } catch { }
+                        }
+
+                        var isNullable = true;
+                        if (hasNullable)
+                        {
+                            try { isNullable = Convert.ToBoolean(r["IS_NULLABLE"]); } catch { }
+                        }
+
+                        var oleDbType = (OleDbType)Convert.ToInt32(r["DATA_TYPE"]);
+                        var maxLen = r.Table.Columns.Contains("CHARACTER_MAXIMUM_LENGTH") ? r["CHARACTER_MAXIMUM_LENGTH"] : null;
+                        var prec = r.Table.Columns.Contains("NUMERIC_PRECISION") ? r["NUMERIC_PRECISION"] : null;
+                        var scale = r.Table.Columns.Contains("NUMERIC_SCALE") ? r["NUMERIC_SCALE"] : null;
+
+                        var typeSql = isAuto ? "AUTOINCREMENT" : ToAccessSqlType(oleDbType, maxLen, prec, scale);
+
+                        var line = "    " + QuoteIdentifier(colName) + " " + typeSql;
+                        if (!isNullable && !isAuto) line += " NOT NULL";
+
+                        if (colDefs != "") colDefs += ",\n";
+                        colDefs += line;
+                    }
+
+                    var pkLine = BuildPrimaryKeyLine(cnn, tableName);
+
+                    var ddl =
+                        "CREATE TABLE " + tableQuoted + " (\n" +
+                        colDefs +
+                        (string.IsNullOrWhiteSpace(pkLine) ? "" : ",\n" + pkLine) +
+                        "\n);\n";
+
+                    return ddl;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, @"Exception");
+                    return null;
+                }
+                finally
+                {
+                    cnn.Close();
+                }
+            }
+        }
+
+        private static string BuildPrimaryKeyLine(OleDbConnection cnn, string tableName)
+        {
+            try
+            {
+                var pk = cnn.GetOleDbSchemaTable(OleDbSchemaGuid.Primary_Keys, new object[] { null, null, tableName });
+                if (pk == null || pk.Rows.Count == 0) return null;
+
+                var pkName = pk.Rows[0]["PK_NAME"]?.ToString();
+                if (string.IsNullOrWhiteSpace(pkName)) pkName = "PK_" + tableName;
+
+                var hasSeq = pk.Columns.Contains("KEY_SEQ");
+                var rows = pk.AsEnumerable();
+                if (hasSeq) rows = rows.OrderBy(r => Convert.ToInt32(r["KEY_SEQ"]));
+
+                var cols = rows
+                    .Select(r => QuoteIdentifier(r["COLUMN_NAME"]?.ToString()))
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToArray();
+
+                if (cols.Length == 0) return null;
+
+                return "    CONSTRAINT " + QuoteIdentifier(pkName) + " PRIMARY KEY (" + string.Join(", ", cols) + ")";
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        
+        private static string ToAccessSqlType(OleDbType oleDbType, object maxLengthObj, object precisionObj, object scaleObj)
+        {
+            int? maxLength = null;
+            int? precision = null;
+            int? scale = null;
+
+            if (!(maxLengthObj is DBNull) && maxLengthObj != null) maxLength = Convert.ToInt32(maxLengthObj);
+            if (!(precisionObj is DBNull) && precisionObj != null) precision = Convert.ToInt32(precisionObj);
+            if (!(scaleObj is DBNull) && scaleObj != null) scale = Convert.ToInt32(scaleObj);
+
+            switch (oleDbType)
+            {
+                case OleDbType.VarWChar:
+                case OleDbType.WChar:
+                case OleDbType.VarChar:
+                case OleDbType.Char:
+                    if (maxLength > 0 && maxLength.Value <= 255)
+                        return "TEXT(" + maxLength.Value + ")";
+                    return "LONGTEXT";
+
+                case OleDbType.LongVarWChar:
+                case OleDbType.LongVarChar:
+                    return "LONGTEXT";
+
+                case OleDbType.Boolean:
+                    return "YESNO";
+
+                case OleDbType.TinyInt:
+                case OleDbType.UnsignedTinyInt:
+                    return "BYTE";
+
+                case OleDbType.SmallInt:
+                case OleDbType.UnsignedSmallInt:
+                    return "SHORT";
+
+                case OleDbType.Integer:
+                case OleDbType.UnsignedInt:
+                    return "LONG";
+
+                case OleDbType.BigInt:
+                case OleDbType.UnsignedBigInt:
+                    return "BIGINT";
+
+                case OleDbType.Single:
+                    return "SINGLE";
+
+                case OleDbType.Double:
+                    return "DOUBLE";
+
+                case OleDbType.Currency:
+                    return "CURRENCY";
+
+                case OleDbType.Date:
+                case OleDbType.DBDate:
+                case OleDbType.DBTime:
+                case OleDbType.DBTimeStamp:
+                    return "DATETIME";
+
+                case OleDbType.Guid:
+                    return "GUID";
+
+                case OleDbType.Decimal:
+                case OleDbType.Numeric:
+                    if (precision.HasValue && scale.HasValue) return "DECIMAL(" + precision.Value + "," + scale.Value + ")";
+                    if (precision.HasValue) return "DECIMAL(" + precision.Value + ")";
+                    return "DECIMAL";
+
+                case OleDbType.Binary:
+                case OleDbType.VarBinary:
+                case OleDbType.LongVarBinary:
+                    return "LONGBINARY";
+
+                default:
+                    return oleDbType.ToString().ToUpper();
+            }
+        }
+
 
         private static HashSet<string> CollectAutoIncrementColumns(OleDbConnection connection, string tableOrViewName)
         {
