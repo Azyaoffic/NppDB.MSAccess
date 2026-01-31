@@ -487,10 +487,15 @@ namespace NppDB.MSAccess
                             var tables = ctx.fromClause?._tables;
                             var joins = ctx._joinClause;
                             var columns = ctx.selectClause?._resultColumns;
-                            if ((tables != null && tables.Count > 1 || joins != null && joins.Count > 0) && columns != null &&
-                                columns.Any(c => c.STAR() != null)) 
-                            {
 
+                            if (columns != null && columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.SELECT_ALL_IN_SELECT_CLAUSE);
+                            }
+                            
+                            if ((tables != null && tables.Count > 1 || joins != null && joins.Count > 0) && columns != null &&
+                                columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
+                            {
                                 command.AddWarning(ctx, ParserMessageType.SELECT_ALL_WITH_MULTIPLE_JOINS);
                             }
                         }
@@ -531,8 +536,14 @@ namespace NppDB.MSAccess
                             var tables = ctx.fromClause?._tables;
                             var joins = ctx._joinClause;
                             var columns = ctx.selectClause._resultColumns;
+                            
+                            if (columns != null && columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.SELECT_ALL_IN_SELECT_CLAUSE);
+                            }
+                            
                             if ((tables != null && tables.Count > 1 || joins != null && joins.Count > 0) && columns != null &&
-                                columns.Any(c => c.STAR() != null))
+                                columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
                             {
                                 command.AddWarning(ctx, ParserMessageType.SELECT_ALL_WITH_MULTIPLE_JOINS);
                             }
@@ -731,6 +742,8 @@ namespace NppDB.MSAccess
                             FindAllTargetTypes(ctx, typeof(MSAccessParser.Table_with_joinsContext), list);
                             if (ctx.WHERE_() == null)
                             {
+                                command.AddWarning(ctx, ParserMessageType.DELETE_STATEMENT_WITHOUT_WHERE_CLAUSE);
+
                                 foreach (IParseTree item in list)
                                 {
                                     if (item is MSAccessParser.Table_with_joinsContext joinsCtx && HasText(joinsCtx)) 
@@ -751,6 +764,11 @@ namespace NppDB.MSAccess
                     {
                         if (context is MSAccessParser.Update_stmtContext updctx)
                         {
+                            if (updctx.WHERE_() == null)
+                            {
+                                command.AddWarning(updctx, ParserMessageType.UPDATE_STATEMENT_WITHOUT_WHERE_CLAUSE);
+                            }
+
                             if (updctx.WHERE_() != null && updctx.where_expr?.exception != null)
                             {
                                 command.AddWarning(updctx, ParserMessageType.MISSING_EXPRESSION_IN_WHERE_CLAUSE);
