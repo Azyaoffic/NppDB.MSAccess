@@ -821,7 +821,14 @@ namespace NppDB.MSAccess
                                         var lhs = ctx.lhs.GetAsSymbolOfType(MSAccessParser.NULL_);
                                         var rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.NULL_);
                                         if (lhs != null || rhs != null)
-                                            command.AddWarning(ctx, ParserMessageType.EQUALITY_WITH_NULL);
+                                        {
+                                            if (ctx.op.Type == MSAccessParser.EQ)
+                                                command.AddWarning(ctx, ParserMessageType.EQUALITY_WITH_NULL);
+                                            else if (ctx.op.Type.In(MSAccessParser.NOT_EQ1, MSAccessParser.NOT_EQ2))
+                                                command.AddWarning(ctx, ParserMessageType.NOT_EQUALITY_WITH_NULL);
+                                            else
+                                                command.AddWarning(ctx, ParserMessageType.COMPARING_WITH_NULL);
+                                        }
 
                                         if (ctx.op.Type == MSAccessParser.EQ &&
                                             ctx.selector != null && ctx.selector.Type == MSAccessParser.ALL_)
