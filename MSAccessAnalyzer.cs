@@ -974,6 +974,28 @@ namespace NppDB.MSAccess
                         }
                         break;
                     }
+                case MSAccessParser.RULE_param_def:
+                {
+                    if (context is MSAccessParser.Param_defContext ctx && HasText(ctx) && HasText(ctx.type_name()))
+                    {
+                        var typeText = ctx.type_name().GetText().ToLower();
+
+                        if (typeText.In("single", "double"))
+                        {
+                            var ddlParent = FindParentOfAnyType(ctx, new List<Type>
+                            {
+                                typeof(MSAccessParser.Create_table_stmtContext),
+                                typeof(MSAccessParser.Alter_table_stmtContext),
+                            });
+
+                            if (ddlParent != null)
+                            {
+                                command.AddWarning(ctx.type_name(), ParserMessageType.USE_FLOAT_DATA_TYPE);
+                            }
+                        }
+                    }
+                    break;
+                }
             }
         }
 
