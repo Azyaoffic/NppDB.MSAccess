@@ -291,6 +291,39 @@ namespace NppDB.MSAccess
             return false;
         }
 
+        private static int CountJoinTokens(IParseTree context, int count)
+        {
+            if (context is ITerminalNode t && t.Symbol != null && t.Symbol.Type == MSAccessParser.JOIN_)
+                count++;
+
+            for (var i = 0; i < context.ChildCount; ++i)
+                count = CountJoinTokens(context.GetChild(i), count);
+
+            return count;
+        }
+
+        
+        private static int CountSubSelectStatements(IParseTree context, int count)
+        {
+            if (context is MSAccessParser.Select_stmtContext)
+                count++;
+
+            for (var i = 0; i < context.ChildCount; ++i)
+                count = CountSubSelectStatements(context.GetChild(i), count);
+
+            return count;
+        }
+
+        private static bool IsExcessivelyComplexSelect(int joinCount, int subqueryCount, int columnCount, bool hasGroupBy, bool hasAggregates)
+        {
+            // TODO: Tune thresholds as needed
+            if (joinCount >= 3) return true;
+            if (subqueryCount >= 2) return true;
+            if (columnCount >= 20) return true;
+
+            return joinCount >= 2 && hasGroupBy && hasAggregates;
+        }
+
 
         private static void FindSelectClauseTopWarnings(MSAccessParser.Select_into_stmtContext ctx, ParsedTreeCommand command) 
         {
@@ -520,6 +553,19 @@ namespace NppDB.MSAccess
                             {
                                 command.AddWarning(ctx, ParserMessageType.SELECT_ALL_WITH_MULTIPLE_JOINS);
                             }
+                            
+                            var tablesCount = tables?.Count ?? 0;
+                            var joinTokenCount = CountJoinTokens(ctx, 0);
+                            var joinCount = joinTokenCount + Math.Max(0, tablesCount - 1);
+                            var columnCount = columns?.Count ?? 0;
+                            var hasGroupBy = ctx.groupByClause != null;
+                            var hasAggregates = HasAggregateFunction(ctx.selectClause);
+                            var subqueryCount = CountSubSelectStatements(ctx, 0);
+
+                            if (IsExcessivelyComplexSelect(joinCount, subqueryCount, columnCount, hasGroupBy, hasAggregates))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.COMPLEX_SELECT_STATEMENT);
+                            }
                         }
                         break;
                     }
@@ -580,6 +626,19 @@ namespace NppDB.MSAccess
                                 && columns.Count != ctx.groupByClause._groupingTerms.Count)
                             {
                                 command.AddWarning(ctx, ParserMessageType.MISSING_COLUMN_IN_GROUP_BY_CLAUSE);
+                            }
+                            
+                            var tablesCount = tables?.Count ?? 0;
+                            var joinTokenCount = CountJoinTokens(ctx, 0);
+                            var joinCount = joinTokenCount + Math.Max(0, tablesCount - 1);
+                            var columnCount = columns?.Count ?? 0;
+                            var hasGroupBy = ctx.groupByClause != null;
+                            var hasAggregates = HasAggregateFunction(ctx.selectClause);
+                            var subqueryCount = CountSubSelectStatements(ctx, 0);
+
+                            if (IsExcessivelyComplexSelect(joinCount, subqueryCount, columnCount, hasGroupBy, hasAggregates))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.COMPLEX_SELECT_STATEMENT);
                             }
                         }
                         break;
