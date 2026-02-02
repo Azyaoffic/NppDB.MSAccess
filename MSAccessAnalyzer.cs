@@ -996,6 +996,41 @@ namespace NppDB.MSAccess
                     }
                     break;
                 }
+                case MSAccessParser.RULE_create_table_stmt:
+                {
+                    if (context is MSAccessParser.Create_table_stmtContext ctx)
+                    {
+                        if (ctx.OPEN_PAR() != null)
+                        {
+                            var hasConstraints = false;
+
+                            var multi = ctx.multiple_field_constraint();
+                            if (multi != null && multi.Length > 0)
+                                hasConstraints = true;
+
+                            if (!hasConstraints)
+                            {
+                                var cols = ctx.column_def();
+                                if (cols != null)
+                                {
+                                    foreach (var c in cols)
+                                    {
+                                        if (c == null) continue;
+
+                                        if (c.NOT_() != null && c.NULL_() != null || c.single_field_constraint() != null) { hasConstraints = true; break; }
+                                    }
+                                }
+                            }
+
+                            if (!hasConstraints)
+                            {
+                                command.AddWarning(ctx, ParserMessageType.MISSING_CONSTRAINTS_IN_CREATE_TABLE);
+                            }
+                        }
+                    }
+                    break;
+                }
+
             }
         }
 
