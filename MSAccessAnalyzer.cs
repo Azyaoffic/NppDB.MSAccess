@@ -828,6 +828,20 @@ namespace NppDB.MSAccess
                                 case MSAccessParser.LIKE_:
                                     {
                                         var rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.STRING_LITERAL);
+                                        if (rhs != null)
+                                        {
+                                            var t = rhs.Text;
+                                            var q = t.IndexOf('\'');
+                                            if (q >= 0 && q + 1 < t.Length)
+                                            {
+                                                var first = t[q + 1];
+                                                if (first == '*' || first == '?' || first == '%' || first == '_')
+                                                {
+                                                    command.AddWarning(ctx, ParserMessageType.LEADING_WILDCARD_IN_LIKE_EXPRESSION);
+                                                }
+                                            }
+                                        }
+                                        
                                         if (rhs != null && !rhs.Text.Contains("%") && !rhs.Text.Contains("_"))
                                             command.AddWarning(ctx, ParserMessageType.MISSING_WILDCARDS_IN_LIKE_EXPRESSION);
                                     }
