@@ -269,6 +269,28 @@ namespace NppDB.MSAccess
             }
             return true;
         }
+        
+        private static bool HasRandomOrderingFunction(IParseTree context)
+        {
+            if (context is MSAccessParser.Function_exprContext funcExpr && funcExpr.functionName != null)
+            {
+                var name = funcExpr.functionName.GetText().ToLower();
+                if (name.In("rnd", "random", "rand"))
+                    return true;
+            }
+
+            for (var n = 0; n < context.ChildCount; ++n)
+            {
+                var child = context.GetChild(n);
+                if (!(child is MSAccessParser.Select_clauseContext))
+                {
+                    if (HasRandomOrderingFunction(child)) return true;
+                }
+            }
+
+            return false;
+        }
+
 
         private static void FindSelectClauseTopWarnings(MSAccessParser.Select_into_stmtContext ctx, ParsedTreeCommand command) 
         {
@@ -581,6 +603,12 @@ namespace NppDB.MSAccess
                         {
                             foreach (var orderingTerm in ctx._orderingTerms)
                             {
+                                if (orderingTerm?.orderingExpr != null && HasRandomOrderingFunction(orderingTerm.orderingExpr))
+                                {
+                                    command.AddWarning(ctx, ParserMessageType.ORDER_BY_RANDOM_FUNCTION);
+                                    break;
+                                }
+        
                                 if (orderingTerm.orderingExpr.literalExpr == null) continue;
 
                                 command.AddWarning(ctx, ParserMessageType.ORDERING_BY_ORDINAL);
