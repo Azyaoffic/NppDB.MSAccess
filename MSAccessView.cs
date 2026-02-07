@@ -6,7 +6,7 @@ namespace NppDB.MSAccess
         public MsAccessView()
         {
             TypeName = "VIEW";
-            SelectedImageKey = ImageKey = "Table";
+            SelectedImageKey = ImageKey = "View";
         }
     }
 }
