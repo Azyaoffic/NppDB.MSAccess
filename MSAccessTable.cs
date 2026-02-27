@@ -812,7 +812,7 @@ namespace NppDB.MSAccess
             
             MSAccessPromptReading.LibraryFilePath = Path.Combine(dir, "promptLibrary.xml");
             
-            MSAccessPromptReading.PreferencesFilePath = Path.Combine(dir, "prompt_preferences.json");
+            MSAccessPromptReading.PreferencesFilePath = Path.Combine(dir, "settings.json");
         }
 
         private List<PromptItemNoPlaceholder> LoadTablePromptsFromFile(INppDbCommandHost commandHost)

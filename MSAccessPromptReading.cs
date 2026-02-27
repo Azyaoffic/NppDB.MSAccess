@@ -9,8 +9,14 @@ namespace NppDB.MSAccess
 {
     public class PromptPreferences
     {
-        public string ResponseLanguage {get; set;}
-        public string CustomInstructions {get; set;}
+        public string ResponseLanguage { get; set; }
+        public string CustomInstructions { get; set; }
+        public string OpenLlmUrl { get; set; }
+    }
+
+    internal class SettingsFileRoot
+    {
+        public PromptPreferences Prompt { get; set; }
     }
 
     public class MSAccessPromptReading
@@ -90,33 +96,58 @@ namespace NppDB.MSAccess
         {
             try
             {
-                if (File.Exists(PreferencesFilePath))
+                if (!string.IsNullOrWhiteSpace(PreferencesFilePath) && File.Exists(PreferencesFilePath))
                 {
                     var readData = File.ReadAllText(PreferencesFilePath);
                     if (!string.IsNullOrEmpty(readData))
                     {
-                        return JsonConvert.DeserializeObject<PromptPreferences>(readData);
+                        try
+                        {
+                            var root = JsonConvert.DeserializeObject<SettingsFileRoot>(readData);
+                            if (root != null && root.Prompt != null)
+                                return Normalize(root.Prompt);
+                        }
+                        catch {}
                     }
                 }
 
                 return new PromptPreferences
                 {
                     ResponseLanguage = "English",
-                    CustomInstructions = ""
+                    CustomInstructions = "",
+                    OpenLlmUrl = "https://chatgpt.com/"
                 };
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error reading preferences: {ex.Message}", "Error", MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
+
                 return new PromptPreferences
                 {
                     ResponseLanguage = "English",
-                    CustomInstructions = ""
+                    CustomInstructions = "",
+                    OpenLlmUrl = "https://chatgpt.com/"
                 };
             }
         }
         
+        private static PromptPreferences Normalize(PromptPreferences p)
+        {
+            if (p == null) p = new PromptPreferences();
+
+            if (string.IsNullOrWhiteSpace(p.ResponseLanguage))
+                p.ResponseLanguage = "English";
+
+            if (p.CustomInstructions == null)
+                p.CustomInstructions = "";
+
+            if (string.IsNullOrWhiteSpace(p.OpenLlmUrl))
+                p.OpenLlmUrl = "https://chatgpt.com/";
+
+            return p;
+        }
+
         public static string LoadUserPromptPreferences()
         {
             var preferences = ReadUserPreferences();
