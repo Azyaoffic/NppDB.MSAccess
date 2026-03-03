@@ -47,7 +47,7 @@ namespace NppDB.MSAccess
             if (string.IsNullOrEmpty(ServerAddress) || !File.Exists(ServerAddress))
             {
                 if (!string.IsNullOrEmpty(ServerAddress) &&
-                    MessageBox.Show("file(" + ServerAddress + ") don't existed.\ncreate a new database?", @"Alert",
+                    MessageBox.Show("File (" + ServerAddress + ") doesn't exist.\nCreate a new database?", @"Alert",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.No)
                 {
                      return false;
