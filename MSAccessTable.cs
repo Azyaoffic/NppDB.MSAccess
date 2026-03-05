@@ -103,7 +103,7 @@ namespace NppDB.MSAccess
                 host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
             }));
-            var exportMenu = new ToolStripMenuItem("Select all as");
+            var exportMenu = new ToolStripMenuItem("Select all into a file");
             exportMenu.DropDownItems.Add(new ToolStripMenuItem("JSON", null, (s, e) => { SelectAllAsJson(); }));
             exportMenu.DropDownItems.Add(new ToolStripMenuItem("CSV", null, (s, e) => { SelectAllAsCsv(); }));
             menuList.Items.Add(exportMenu);
