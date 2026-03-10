@@ -190,24 +190,6 @@ namespace NppDB.MSAccess
                 }));
             }
             
-            // options to generate AI prompt
-            _tableAiPrompts = LoadTablePromptsFromFile(host);
-
-            if (_tableAiPrompts.Count > 0)
-            {
-                menuList.Items.Add(new ToolStripSeparator());
-
-                var aiMenu = new ToolStripMenuItem("AI Prompts");
-                
-                foreach (var prompt in _tableAiPrompts)
-                {
-                    aiMenu.DropDownItems.Add(new ToolStripMenuItem(prompt.Title, null,
-                        (s, e) => ShowTablePrompt(prompt)));
-                }
-
-                menuList.Items.Add(aiMenu);
-            }
-
             return menuList;
         }
 
