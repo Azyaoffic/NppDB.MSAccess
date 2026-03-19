@@ -92,17 +92,27 @@ namespace NppDB.MSAccess
                 host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
             }));
-            var exportMenu = new ToolStripMenuItem("Select all into a file");
-            exportMenu.DropDownItems.Add(new ToolStripMenuItem("JSON", null, (s, e) => { SelectAllAsJson(); }));
-            exportMenu.DropDownItems.Add(new ToolStripMenuItem("CSV", null, (s, e) => { SelectAllAsCsv(); }));
-            menuList.Items.Add(exportMenu);
-
+            
+            menuList.Items.Add(new ToolStripMenuItem("Count amount of rows", null, (s, e) =>
+            {
+                host.Execute(NppDbCommandType.NEW_FILE, null);
+                host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
+                var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                var query = $"SELECT COUNT(*) AS [Count] FROM {objectNameQuoted}";
+                host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
+                host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
+                host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
+            }));
+            
+            menuList.Items.Add(new ToolStripSeparator());
+            menuList.Items.Add(new ToolStripMenuItem("Select all as JSON", null, (s, e) => { SelectAllAsJson(); }));
+            menuList.Items.Add(new ToolStripMenuItem("Select all as CSV", null, (s, e) => { SelectAllAsCsv(); }));
             menuList.Items.Add(new ToolStripSeparator());
             
             if (TypeName == "TABLE")
             {
                 // this one only includes PK as anything else is much harder to extract
-                menuList.Items.Add(new ToolStripButton("Generate CREATE TABLE query", null, (s, e) =>
+                menuList.Items.Add(new ToolStripButton("Generate CREATE TABLE statement", null, (s, e) =>
                 {
                     var ddl = GenerateCreateTableQuery(connect);
                     if (string.IsNullOrWhiteSpace(ddl)) return;
