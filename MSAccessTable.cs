@@ -661,6 +661,7 @@ namespace NppDB.MSAccess
                         typeDetails += $"({numericPrecisionObj})";
                 }
                 
+                if (!isNullable) typeDetails += " NOT NULL";
                 if (isAutoIncrement) typeDetails += " AUTOINCREMENT";
                 if (seed != 0 || inc != 0) typeDetails += $"({seed},{inc})";
 
