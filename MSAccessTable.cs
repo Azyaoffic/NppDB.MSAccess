@@ -93,7 +93,7 @@ namespace NppDB.MSAccess
                 host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
             }));
             
-            menuList.Items.Add(new ToolStripMenuItem("Count amount of rows", null, (s, e) =>
+            menuList.Items.Add(new ToolStripMenuItem("Count the number of of rows", null, (s, e) =>
             {
                 host.Execute(NppDbCommandType.NEW_FILE, null);
                 host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
@@ -146,7 +146,7 @@ namespace NppDB.MSAccess
             menuList.Items.Add(new ToolStripButton($"{dropObjectText} (RESTRICT)", null, (s, e) =>
             {
                 var currentObjectName = Text;
-                var message = $"Are you sure you want to {TypeName.ToLower()} '{currentObjectName}' (RESTRICT)?\n" +
+                var message = $"Are you sure you want to drop the {TypeName.ToLower()} '{currentObjectName}' with RESTRICT?\n" +
                               $"This action cannot be undone and will fail if other objects depend on this {TypeName.ToLower()}.";
                 if (MessageBox.Show(message, $@"Confirm Drop {TypeName}", MessageBoxButtons.YesNo,
                         MessageBoxIcon.Warning) != DialogResult.Yes) return;
@@ -169,7 +169,7 @@ namespace NppDB.MSAccess
                 menuList.Items.Add(new ToolStripButton("Drop table (CASCADE)", null, (s, e) =>
                 {
                     var currentTableName = Text;
-                    var message = $"Are you sure you want to drop the table '{currentTableName}' (CASCADE)?\n" +
+                    var message = $"Are you sure you want to drop the table '{currentTableName}' with CASCADE?\n" +
                                   "WARNING: MS Access 'DROP TABLE' behaves like RESTRICT by default. To achieve a true CASCADE effect (dropping dependent objects like relationships), those dependencies must often be removed manually *before* dropping the table.\n" +
                                   "This action cannot be undone.";
                     if (MessageBox.Show(message, @"Confirm Drop Table", MessageBoxButtons.YesNo,
