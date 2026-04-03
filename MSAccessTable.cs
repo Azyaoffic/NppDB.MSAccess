@@ -74,7 +74,19 @@ namespace NppDB.MSAccess
 
             menuList.Items.Add(new ToolStripButton("Select all rows", null, (s, e) =>
             {
+                var sourceBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 host.Execute(NppDbCommandType.NEW_FILE, null);
+                var targetBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                if (sourceBufferObj is IntPtr sourceBufferId &&
+                    targetBufferObj is IntPtr targetBufferId &&
+                    sourceBufferId != IntPtr.Zero &&
+                    targetBufferId != IntPtr.Zero &&
+                    sourceBufferId != targetBufferId)
+                {
+                    host.Execute(
+                        NppDbCommandType.CLONE_DB_TREE_STATE_TO_BUFFER,
+                        new object[] { sourceBufferId, targetBufferId });
+                }
                 host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
                 var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 var query = $"SELECT * FROM {objectNameQuoted}";
@@ -84,7 +96,19 @@ namespace NppDB.MSAccess
             }));
             menuList.Items.Add(new ToolStripButton("Select top 100 rows", null, (s, e) =>
             {
+                var sourceBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 host.Execute(NppDbCommandType.NEW_FILE, null);
+                var targetBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                if (sourceBufferObj is IntPtr sourceBufferId &&
+                    targetBufferObj is IntPtr targetBufferId &&
+                    sourceBufferId != IntPtr.Zero &&
+                    targetBufferId != IntPtr.Zero &&
+                    sourceBufferId != targetBufferId)
+                {
+                    host.Execute(
+                        NppDbCommandType.CLONE_DB_TREE_STATE_TO_BUFFER,
+                        new object[] { sourceBufferId, targetBufferId });
+                }
                 host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
                 var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 var query = $"SELECT TOP 100 * FROM {objectNameQuoted}";
@@ -95,7 +119,19 @@ namespace NppDB.MSAccess
             
             menuList.Items.Add(new ToolStripMenuItem("Count the number of of rows", null, (s, e) =>
             {
+                var sourceBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 host.Execute(NppDbCommandType.NEW_FILE, null);
+                var targetBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                if (sourceBufferObj is IntPtr sourceBufferId &&
+                    targetBufferObj is IntPtr targetBufferId &&
+                    sourceBufferId != IntPtr.Zero &&
+                    targetBufferId != IntPtr.Zero &&
+                    sourceBufferId != targetBufferId)
+                {
+                    host.Execute(
+                        NppDbCommandType.CLONE_DB_TREE_STATE_TO_BUFFER,
+                        new object[] { sourceBufferId, targetBufferId });
+                }
                 host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
                 var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 var query = $"SELECT COUNT(*) AS [Count] FROM {objectNameQuoted}";
@@ -126,8 +162,22 @@ namespace NppDB.MSAccess
                         // ignore
                     }
 
+                    var sourceBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     host.Execute(NppDbCommandType.NEW_FILE, null);
+                    var targetBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                    if (sourceBufferObj is IntPtr sourceBufferId &&
+                        targetBufferObj is IntPtr targetBufferId &&
+                        sourceBufferId != IntPtr.Zero &&
+                        targetBufferId != IntPtr.Zero &&
+                        sourceBufferId != targetBufferId)
+                    {
+                        host.Execute(
+                            NppDbCommandType.CLONE_DB_TREE_STATE_TO_BUFFER,
+                            new object[] { sourceBufferId, targetBufferId });
+                    }
                     host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
+                    var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                    host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                     host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { ddl });
 
                     MessageBox.Show(
@@ -308,6 +358,8 @@ namespace NppDB.MSAccess
                         new object[] { sourceBufferId, targetBufferId });
                 }
 
+                var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { text });
 
                 MessageBox.Show(

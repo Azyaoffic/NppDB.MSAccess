@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.Windows.Forms;
 using NppDB.Comm;
 
@@ -69,7 +70,19 @@ namespace NppDB.MSAccess
 
             menuList.Items.Add(new ToolStripButton("Select distinct values", null, (s, e) =>
                 {
+                    var sourceBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     host.Execute(NppDbCommandType.NEW_FILE, null);
+                    var targetBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                    if (sourceBufferObj is IntPtr sourceBufferId &&
+                        targetBufferObj is IntPtr targetBufferId &&
+                        sourceBufferId != IntPtr.Zero &&
+                        targetBufferId != IntPtr.Zero &&
+                        sourceBufferId != targetBufferId)
+                    {
+                        host.Execute(
+                            NppDbCommandType.CLONE_DB_TREE_STATE_TO_BUFFER,
+                            new object[] { sourceBufferId, targetBufferId });
+                    }
                     host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
                     var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     var query = $"SELECT DISTINCT {columnQuoted} FROM {tableQuoted} ORDER BY {columnQuoted};";
@@ -82,7 +95,19 @@ namespace NppDB.MSAccess
 
             menuList.Items.Add(new ToolStripButton("Create statement to change the data type", null, (s, e) =>
                 {
+                    var sourceBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     host.Execute(NppDbCommandType.NEW_FILE, null);
+                    var targetBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                    if (sourceBufferObj is IntPtr sourceBufferId &&
+                        targetBufferObj is IntPtr targetBufferId &&
+                        sourceBufferId != IntPtr.Zero &&
+                        targetBufferId != IntPtr.Zero &&
+                        sourceBufferId != targetBufferId)
+                    {
+                        host.Execute(
+                            NppDbCommandType.CLONE_DB_TREE_STATE_TO_BUFFER,
+                            new object[] { sourceBufferId, targetBufferId });
+                    }
                     host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
                     var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     var query = $"ALTER TABLE {tableQuoted} ALTER COLUMN {columnQuoted} <DATA_TYPE>;";
@@ -93,7 +118,19 @@ namespace NppDB.MSAccess
 
             menuList.Items.Add(new ToolStripButton("Create statement to drop the column", null, (s, e) =>
                 {
+                    var sourceBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     host.Execute(NppDbCommandType.NEW_FILE, null);
+                    var targetBufferObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                    if (sourceBufferObj is IntPtr sourceBufferId &&
+                        targetBufferObj is IntPtr targetBufferId &&
+                        sourceBufferId != IntPtr.Zero &&
+                        targetBufferId != IntPtr.Zero &&
+                        sourceBufferId != targetBufferId)
+                    {
+                        host.Execute(
+                            NppDbCommandType.CLONE_DB_TREE_STATE_TO_BUFFER,
+                            new object[] { sourceBufferId, targetBufferId });
+                    }
                     host.Execute(NppDbCommandType.SET_SQL_LANGUAGE, null);
                     var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                     var query = $"ALTER TABLE {tableQuoted} DROP COLUMN {columnQuoted};";
