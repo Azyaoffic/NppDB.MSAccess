@@ -39,6 +39,7 @@ namespace NppDB.MSAccess
                     var primaryKeyColumnNames = CollectPrimaryKeys(cnn, ref columns);
                     var foreignKeyColumnNames = CollectForeignKeys(cnn, ref columns);
                     var indexedColumnNames = CollectIndices(cnn, ref columns);
+                    CollectCheckConstraints(cnn, ref columns);
 
                     var columnCount = CollectColumns(cnn, ref columns, primaryKeyColumnNames, foreignKeyColumnNames,
                         indexedColumnNames);
@@ -717,6 +718,12 @@ namespace NppDB.MSAccess
                 if (isAutoIncrement) typeDetails += " AUTOINCREMENT";
                 if (seed != 0 || inc != 0) typeDetails += $"({seed},{inc})";
 
+                var defaultValueObj = row["column_default"];
+                if (!(defaultValueObj is DBNull) && defaultValueObj != null && !string.IsNullOrWhiteSpace(defaultValueObj.ToString()))
+                {
+                    typeDetails += $" DEFAULT {defaultValueObj}";
+                }
+
                 var options = 0;
                 if (!isNullable) options += 1;
                 if (indexedColumnNames.Contains(columnName)) options += 10;
@@ -737,8 +744,7 @@ namespace NppDB.MSAccess
                 else 
                     tooltipText.AppendLine();
 
-                var defaultValueObj = row["column_default"];
-                if (!(defaultValueObj is DBNull) && defaultValueObj != null)
+                if (!(defaultValueObj is DBNull) && defaultValueObj != null && !string.IsNullOrWhiteSpace(defaultValueObj.ToString()))
                 {
                     tooltipText.AppendLine($"Default: {defaultValueObj}");
                 }
@@ -815,6 +821,187 @@ namespace NppDB.MSAccess
             }
 
             return names;
+        }
+
+        private void CollectCheckConstraints(OleDbConnection connection, ref List<MsAccessColumn> columns)
+        {
+            try
+            {
+                var addedCheckNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                // TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_CATALOG, CONSTRAINT_SCHEMA, CONSTRAINT_NAME.
+                DataTable checkConstraintsByTable = null;
+                try
+                {
+                    checkConstraintsByTable = connection.GetOleDbSchemaTable(
+                        OleDbSchemaGuid.Check_Constraints_By_Table,
+                        new object[] { null, null, Text, null, null, null });
+                }
+                catch {}
+
+                AddCheckConstraintsFromTableRowset(checkConstraintsByTable, ref columns, addedCheckNames);
+                if (addedCheckNames.Count > 0) return;
+
+                try
+                {
+                    checkConstraintsByTable = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Check_Constraints_By_Table, null);
+                }
+                catch
+                {
+                    checkConstraintsByTable = null;
+                }
+
+                AddCheckConstraintsFromTableRowset(checkConstraintsByTable, ref columns, addedCheckNames);
+                if (addedCheckNames.Count > 0) return;
+
+                // Fallback: TABLE_CONSTRAINTS gives the CHECK constraint names; CHECK_CONSTRAINTS gives definitions.
+                var checkNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                DataTable tableConstraints = null;
+                try
+                {
+                    tableConstraints = connection.GetOleDbSchemaTable(
+                        OleDbSchemaGuid.Table_Constraints,
+                        new object[] { null, null, null, null, null, Text });
+                }
+                catch {}
+
+                AddCheckConstraintNamesFromTableConstraints(tableConstraints, checkNames);
+
+                if (checkNames.Count == 0)
+                {
+                    try
+                    {
+                        tableConstraints = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Table_Constraints, null);
+                    }
+                    catch
+                    {
+                        tableConstraints = null;
+                    }
+
+                    AddCheckConstraintNamesFromTableConstraints(tableConstraints, checkNames);
+                }
+
+                if (checkNames.Count == 0)
+                {
+                    DataTable constraintTableUsage = null;
+                    try
+                    {
+                        constraintTableUsage = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Constraint_Table_Usage, null);
+                    }
+                    catch
+                    {
+                        constraintTableUsage = null;
+                    }
+
+                    if (constraintTableUsage != null)
+                    {
+                        foreach (DataRow row in constraintTableUsage.Rows)
+                        {
+                            var tableName = GetSchemaValue(row, "TABLE_NAME");
+                            if (!string.Equals(tableName, Text, StringComparison.OrdinalIgnoreCase)) continue;
+
+                            var constraintName = GetSchemaValue(row, "CONSTRAINT_NAME");
+                            if (!string.IsNullOrWhiteSpace(constraintName))
+                                checkNames.Add(constraintName);
+                        }
+                    }
+                }
+
+                if (checkNames.Count == 0) return;
+
+                DataTable checkConstraints = null;
+                try
+                {
+                    checkConstraints = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Check_Constraints, null);
+                }
+                catch
+                {
+                    // ignore
+                }
+
+                if (checkConstraints == null) return;
+
+                foreach (DataRow row in checkConstraints.Rows)
+                {
+                    var constraintName = GetSchemaValue(row, "CONSTRAINT_NAME");
+                    if (string.IsNullOrWhiteSpace(constraintName)) continue;
+                    if (!checkNames.Contains(constraintName)) continue;
+                    if (addedCheckNames.Contains(constraintName)) continue;
+
+                    var checkClause = GetSchemaValue(row, "CHECK_CLAUSE");
+
+                    columns.Add(CreateCheckConstraintNode(constraintName, checkClause));
+                    addedCheckNames.Add(constraintName);
+                }
+            }
+            catch
+            {
+                // Some Access providers/databases do not expose CHECK constraints through schema rowsets.
+            }
+        }
+
+        private void AddCheckConstraintsFromTableRowset(DataTable schema, ref List<MsAccessColumn> columns,
+            HashSet<string> addedCheckNames)
+        {
+            if (schema == null) return;
+
+            foreach (DataRow row in schema.Rows)
+            {
+                var tableName = GetSchemaValue(row, "TABLE_NAME");
+                if (!string.Equals(tableName, Text, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var constraintName = GetSchemaValue(row, "CONSTRAINT_NAME");
+                if (string.IsNullOrWhiteSpace(constraintName)) continue;
+                if (addedCheckNames.Contains(constraintName)) continue;
+
+                var checkClause = GetSchemaValue(row, "CHECK_CLAUSE");
+
+                columns.Add(CreateCheckConstraintNode(constraintName, checkClause));
+                addedCheckNames.Add(constraintName);
+            }
+        }
+
+        private void AddCheckConstraintNamesFromTableConstraints(DataTable schema, HashSet<string> checkNames)
+        {
+            if (schema == null) return;
+
+            foreach (DataRow row in schema.Rows)
+            {
+                var tableName = GetSchemaValue(row, "TABLE_NAME");
+                if (!string.Equals(tableName, Text, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var constraintType = GetSchemaValue(row, "CONSTRAINT_TYPE");
+                if (string.IsNullOrWhiteSpace(constraintType) ||
+                    constraintType.IndexOf("CHECK", StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                var constraintName = GetSchemaValue(row, "CONSTRAINT_NAME");
+                if (!string.IsNullOrWhiteSpace(constraintName))
+                    checkNames.Add(constraintName);
+            }
+        }
+
+        private static string GetSchemaValue(DataRow row, string columnName)
+        {
+            foreach (DataColumn column in row.Table.Columns)
+            {
+                if (string.Equals(column.ColumnName, columnName, StringComparison.OrdinalIgnoreCase))
+                    return row[column]?.ToString();
+            }
+
+            return string.Empty;
+        }
+
+        private static MsAccessColumn CreateCheckConstraintNode(string constraintName, string checkClause)
+        {
+            var checkText = string.IsNullOrWhiteSpace(checkClause) ? "CHECK" : "CHECK " + checkClause;
+            var checkNode = new MsAccessColumn(constraintName, checkText, 5, 0);
+
+            var tooltipText = new StringBuilder();
+            tooltipText.AppendLine($"Check Constraint: {constraintName}");
+            if (!string.IsNullOrWhiteSpace(checkClause))
+                tooltipText.AppendLine($"Definition: {checkClause}");
+            checkNode.ToolTipText = tooltipText.ToString().TrimEnd();
+
+            return checkNode;
         }
 
         private List<string> CollectIndices(OleDbConnection connection, ref List<MsAccessColumn> columns)

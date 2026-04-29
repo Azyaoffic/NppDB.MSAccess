@@ -36,6 +36,9 @@ namespace NppDB.MSAccess
                 case 4:
                     SelectedImageKey = ImageKey = "Unique_Index";
                     break;
+                case 5:
+                    SelectedImageKey = ImageKey = "Index";
+                    break;
                 default:
                     // FK, PK, Indexed, Not Null
                     SelectedImageKey = ImageKey = $"Column_{options:0000}";
