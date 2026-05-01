@@ -5,7 +5,6 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml.Serialization;
 using NppDB.Comm;
@@ -120,6 +119,12 @@ namespace NppDB.MSAccess
 
             if (!isNewFileScenario)
             {
+                var dependencyMessage = DependencyDiagnostics.BuildMsAccessStartupWarningMessage();
+                if (!string.IsNullOrWhiteSpace(dependencyMessage))
+                {
+                    throw new InvalidOperationException(dependencyMessage);
+                }
+
                 var testBuilder = new OleDbConnectionStringBuilder
                 {
                     Provider = "Microsoft.ACE.OLEDB.12.0",
@@ -146,13 +151,15 @@ namespace NppDB.MSAccess
                             }
                         }
 
-                        MessageBox.Show($"Failed to test connection:\n{oleEx.Message}", @"Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return false;
+                        throw new InvalidOperationException(
+                            DependencyDiagnostics.BuildMsAccessConnectionErrorMessage(oleEx, ServerAddress),
+                            oleEx);
                     }
                     catch (Exception ex)
                     {
-                         MessageBox.Show($"An unexpected error occurred while testing the connection:\n{ex.Message}", @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                         return false;
+                        throw new InvalidOperationException(
+                            DependencyDiagnostics.BuildMsAccessConnectionErrorMessage(ex, ServerAddress),
+                            ex);
                     }
                 }
             }
@@ -160,7 +167,6 @@ namespace NppDB.MSAccess
             Password = "";
             return true;
         }
-
 
         public void Connect()
         {
@@ -180,19 +186,7 @@ namespace NppDB.MSAccess
             }
 
             _conn = new OleDbConnection();
-            var connectionStringToUse = GetConnectionString();
-
-            var maskedConnectionString = connectionStringToUse;
-            if(connectionStringToUse.IndexOf("Password=", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                try {
-                    maskedConnectionString = Regex.Replace(connectionStringToUse, @"(Jet\sOLEDB:Database\sPassword=)[^;]+", "$1*****", RegexOptions.IgnoreCase);
-                } catch {
-                    maskedConnectionString = connectionStringToUse.Replace(Password,"*****");
-                }
-            }
-
-            _conn.ConnectionString = connectionStringToUse;
+            _conn.ConnectionString = GetConnectionString();
 
             if (_conn.State == ConnectionState.Open)
             {
@@ -208,22 +202,28 @@ namespace NppDB.MSAccess
             catch (OleDbException oleEx)
             {
                 _engineVersion = null;
-                var errorDetails = $"Connect FAILED (OleDbException):\n\nErrorCode: {oleEx.ErrorCode}\nHResult: {oleEx.HResult}\nMessage: {oleEx.Message}\n\nConnectionString Used (masked):\n{maskedConnectionString}";
-                MessageBox.Show(errorDetails, @"Connect OLEDB Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (_conn != null)
+                {
+                    _conn.Dispose();
+                    _conn = null;
+                }
 
-                if (_conn == null) throw;
-                _conn.Dispose(); _conn = null;
-                throw;
+                throw new InvalidOperationException(
+                    DependencyDiagnostics.BuildMsAccessConnectionErrorMessage(oleEx, ServerAddress),
+                    oleEx);
             }
             catch (Exception ex)
             {
                 _engineVersion = null;
-                var errorDetails = $"Connect FAILED (Generic Exception):\n\nType: {ex.GetType().Name}\nMessage: {ex.Message}\n\nConnectionString Used (masked):\n{maskedConnectionString}";
-                MessageBox.Show(errorDetails, @"Connect Generic Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (_conn != null)
+                {
+                    _conn.Dispose();
+                    _conn = null;
+                }
 
-                if (_conn == null) throw;
-                _conn.Dispose(); _conn = null;
-                throw;
+                throw new InvalidOperationException(
+                    DependencyDiagnostics.BuildMsAccessConnectionErrorMessage(ex, ServerAddress),
+                    ex);
             }
         }
 
@@ -243,18 +243,11 @@ namespace NppDB.MSAccess
         {
             if (IsOpened) return "CONTINUE";
             if (!CheckLogin()) return "FAIL";
-            try
-            {
-                Connect();
-                Attach();
-                Refresh();
-                return "FRESH_NODES";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message + (ex.InnerException != null ? " : " + ex.InnerException.Message : ""));
-            }
-            return "FAIL";
+
+            Connect();
+            Attach();
+            Refresh();
+            return "FRESH_NODES";
         }
 
         public void Disconnect()
